@@ -1,4 +1,4 @@
-use crate::models::system_info::{FirewallProfile, NetworkInterface, OpenPort};
+use crate::models::system_info::{DnsInfo, DnsLinkInfo, FirewallProfile, NetworkInterface, OpenPort};
 use super::super::linux::proc::{read_tcp_sockets, read_tcp6_sockets};
 
 pub fn list_interfaces() -> Vec<NetworkInterface> {
@@ -144,6 +144,107 @@ pub fn get_firewall_status() -> Vec<FirewallProfile> {
     }
 
     profiles
+}
+
+pub fn collect_dns_info() -> Option<DnsInfo> {
+    let output = std::process::Command::new("resolvectl")
+        .arg("status")
+        .output()
+        .ok()?;
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    if text.trim().is_empty() {
+        return None;
+    }
+
+    let mut info = DnsInfo::default();
+    let mut current_link: Option<DnsLinkInfo> = None;
+    let mut in_global = false;
+
+    for line in text.lines() {
+        // Detect section headers
+        if line.trim_start() == "Global" {
+            if let Some(link) = current_link.take() {
+                info.links.push(link);
+            }
+            in_global = true;
+            continue;
+        }
+
+        // "Link 2 (eth0)" or "Link 10 (eth1)"
+        if line.starts_with("Link ") && line.contains('(') {
+            if let Some(link) = current_link.take() {
+                info.links.push(link);
+            }
+            in_global = false;
+
+            let rest = &line["Link ".len()..];
+            let paren = rest.find('(').unwrap_or(rest.len());
+            let index: u32 = rest[..paren].trim().parse().unwrap_or(0);
+            let name = if paren + 1 < rest.len() {
+                rest[paren + 1..].trim_end_matches(')').trim().to_string()
+            } else {
+                String::new()
+            };
+            current_link = Some(DnsLinkInfo {
+                index,
+                name,
+                ..Default::default()
+            });
+            continue;
+        }
+
+        // Parse key: value pairs (indented lines)
+        let trimmed = line.trim_start();
+        if let Some((raw_key, val)) = trimmed.split_once(':') {
+            let key = raw_key.trim().to_lowercase();
+            let val = val.trim().to_string();
+
+            if in_global {
+                match key.as_str() {
+                    "protocols" => info.protocols = Some(val),
+                    "resolv.conf mode" => info.resolv_conf_mode = Some(val),
+                    "current dns server" => info.current_dns_server = Some(val),
+                    "dns servers" => {
+                        if !val.is_empty() {
+                            info.dns_servers.push(val);
+                        }
+                    }
+                    "dns domain" => info.dns_domain = Some(val),
+                    _ => {}
+                }
+            } else if let Some(ref mut link) = current_link {
+                match key.as_str() {
+                    "current scopes" => link.current_scopes = Some(val),
+                    "protocols" => link.protocols = Some(val),
+                    "current dns server" => link.current_dns_server = Some(val),
+                    "dns servers" => {
+                        if !val.is_empty() {
+                            link.dns_servers.push(val);
+                        }
+                    }
+                    "dns domain" => link.dns_domain = Some(val),
+                    _ => {}
+                }
+            }
+        } else if trimmed.starts_with(' ') || line.starts_with("        ") {
+            // Continuation line for multi-value fields (e.g. additional DNS servers)
+            let val = trimmed.trim().to_string();
+            if !val.is_empty() {
+                if in_global {
+                    info.dns_servers.push(val);
+                } else if let Some(ref mut link) = current_link {
+                    link.dns_servers.push(val);
+                }
+            }
+        }
+    }
+
+    if let Some(link) = current_link {
+        info.links.push(link);
+    }
+
+    Some(info)
 }
 
 pub fn check_smb_v1() -> Option<bool> {

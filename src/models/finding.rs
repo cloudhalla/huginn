@@ -113,6 +113,8 @@ pub struct Finding {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evidence: Option<String>,
     pub passed: bool,
+    #[serde(default)]
+    pub skipped: bool,
 }
 
 impl Finding {
@@ -144,6 +146,34 @@ impl Finding {
             timestamp: Utc::now(),
             evidence: None,
             passed: false,
+            skipped: false,
+        }
+    }
+
+    pub fn skip(
+        rule_id: impl Into<String>,
+        title: impl Into<String>,
+        reason: impl Into<String>,
+        category: Category,
+    ) -> Self {
+        let category_label = category.label().to_string();
+        Self {
+            id: Uuid::new_v4(),
+            rule_id: rule_id.into(),
+            title: title.into(),
+            severity: Severity::Info,
+            severity_label: "INFO".into(),
+            category,
+            category_label,
+            description: reason.into(),
+            current_value: String::new(),
+            expected_value: String::new(),
+            recommendation: String::new(),
+            references: Vec::new(),
+            timestamp: Utc::now(),
+            evidence: None,
+            passed: false,
+            skipped: true,
         }
     }
 
@@ -165,6 +195,7 @@ impl Finding {
             timestamp: Utc::now(),
             evidence: None,
             passed: true,
+            skipped: false,
         }
     }
 

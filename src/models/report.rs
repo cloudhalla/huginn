@@ -11,6 +11,7 @@ pub struct SeveritySummary {
     pub low: usize,
     pub info: usize,
     pub passed: usize,
+    pub skipped: usize,
     pub risk_score: u8,
 }
 
@@ -23,9 +24,14 @@ impl SeveritySummary {
             low: 0,
             info: 0,
             passed: 0,
+            skipped: 0,
             risk_score: 0,
         };
         for f in findings {
+            if f.skipped {
+                s.skipped += 1;
+                continue;
+            }
             if f.passed {
                 s.passed += 1;
                 continue;
@@ -48,6 +54,7 @@ impl SeveritySummary {
             + self.medium * 3
             + self.low * 2
             + self.info;
+        // skipped rules don't count toward the denominator — score based on rules with data
         let total = self.critical + self.high + self.medium + self.low + self.info + self.passed;
         if total == 0 {
             return 0;
@@ -97,6 +104,6 @@ impl Report {
     }
 
     pub fn failed_findings(&self) -> impl Iterator<Item = &Finding> {
-        self.findings.iter().filter(|f| !f.passed)
+        self.findings.iter().filter(|f| !f.passed && !f.skipped)
     }
 }

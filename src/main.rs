@@ -18,7 +18,6 @@ fn main() -> anyhow::Result<()> {
         output_format: cli.output,
         quiet: cli.quiet,
         collectors: cli.collectors,
-        include_passed: cli.include_passed,
     };
 
     match cli.command.unwrap_or(Command::Run) {

@@ -18,19 +18,14 @@ impl Analyzer for FirewallAnalyzer {
         let mut findings = Vec::new();
 
         if info.network.firewall_profiles.is_empty() {
-            findings.push(
-                Finding::fail(
-                    "CIS-9.0",
-                    "Firewall status could not be determined",
-                    Severity::Medium,
-                    Category::FirewallPolicy,
-                    "Unable to retrieve firewall profile data. This may indicate the firewall \
-                     management service is not running or access was denied.",
-                    "Unknown",
-                    "All profiles enabled with inbound default block",
-                    "Ensure the firewall service is running and re-run with elevated privileges.",
-                ),
-            );
+            findings.push(Finding::skip(
+                "CIS-9.0",
+                "Firewall status — data unavailable",
+                "Unable to retrieve firewall profile data. This may indicate the firewall \
+                 management service is not running, the tool lacks elevated privileges, or \
+                 no supported firewall tool (ufw/iptables/netsh) was found.",
+                Category::FirewallPolicy,
+            ));
             return Ok(findings);
         }
 
@@ -150,46 +145,50 @@ impl Analyzer for SmbV1Analyzer {
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
 
-        if let Some(smb_v1) = info.security.smb_v1_enabled {
-            if smb_v1 {
-                findings.push(
-                    Finding::fail(
-                        "CIS-18.3.3",
-                        "SMBv1 protocol is enabled",
-                        Severity::Critical,
-                        Category::NetworkSecurity,
-                        "SMBv1 is a legacy protocol with multiple critical vulnerabilities, \
-                         most notably exploited by the EternalBlue/WannaCry ransomware campaign. \
-                         SMBv1 does not support modern security features like encryption, \
-                         pre-authentication integrity, or secure dialects. There is virtually \
-                         no legitimate reason to have it enabled in any modern environment.",
-                        "SMBv1 enabled",
-                        "SMBv1 disabled",
-                        "Disable SMBv1 on Windows via PowerShell (requires reboot): \
-                         Set-SmbServerConfiguration -EnableSMB1Protocol $false. \
-                         Or via DISM: dism /online /norestart /disable-feature \
-                         /featurename:SMB1Protocol. \
-                         On Linux/Samba, set 'min protocol = SMB2' in smb.conf.",
-                    )
-                    .with_refs(vec![
-                        ComplianceRef::cis(
-                            "CIS WS2022 18.3.3",
-                            "Ensure 'Configure use of passwords for fixed data drives' is set to 'Enabled'",
-                        ),
-                        ComplianceRef::cis(
-                            "MS-L1",
-                            "Disable SMBv1: Microsoft Security Advisory 2696547",
-                        ),
-                        ComplianceRef::nist("NIST CM-7(2)", "Least Functionality | Prevent Use of Functions/Ports/Protocols/Services"),
-                    ]),
-                );
-            } else {
-                findings.push(Finding::pass(
+        match info.security.smb_v1_enabled {
+            None => findings.push(Finding::skip(
+                "CIS-18.3.3",
+                "SMBv1 protocol status — data unavailable",
+                "Unable to determine SMBv1 status. On Linux, this requires /etc/samba/smb.conf; \
+                 on Windows, registry or PowerShell access is needed.",
+                Category::NetworkSecurity,
+            )),
+            Some(true) => findings.push(
+                Finding::fail(
                     "CIS-18.3.3",
-                    "SMBv1 protocol is disabled",
+                    "SMBv1 protocol is enabled",
+                    Severity::Critical,
                     Category::NetworkSecurity,
-                ));
-            }
+                    "SMBv1 is a legacy protocol with multiple critical vulnerabilities, \
+                     most notably exploited by the EternalBlue/WannaCry ransomware campaign. \
+                     SMBv1 does not support modern security features like encryption, \
+                     pre-authentication integrity, or secure dialects. There is virtually \
+                     no legitimate reason to have it enabled in any modern environment.",
+                    "SMBv1 enabled",
+                    "SMBv1 disabled",
+                    "Disable SMBv1 on Windows via PowerShell (requires reboot): \
+                     Set-SmbServerConfiguration -EnableSMB1Protocol $false. \
+                     Or via DISM: dism /online /norestart /disable-feature \
+                     /featurename:SMB1Protocol. \
+                     On Linux/Samba, set 'min protocol = SMB2' in smb.conf.",
+                )
+                .with_refs(vec![
+                    ComplianceRef::cis(
+                        "CIS WS2022 18.3.3",
+                        "Ensure 'Configure use of passwords for fixed data drives' is set to 'Enabled'",
+                    ),
+                    ComplianceRef::cis(
+                        "MS-L1",
+                        "Disable SMBv1: Microsoft Security Advisory 2696547",
+                    ),
+                    ComplianceRef::nist("NIST CM-7(2)", "Least Functionality | Prevent Use of Functions/Ports/Protocols/Services"),
+                ]),
+            ),
+            Some(false) => findings.push(Finding::pass(
+                "CIS-18.3.3",
+                "SMBv1 protocol is disabled",
+                Category::NetworkSecurity,
+            )),
         }
 
         Ok(findings)

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,19 +13,48 @@
   <nav class="sidebar">
     <div class="sidebar-brand">
       <h1>huginn</h1>
-      <p>Security Assessment</p>
+      <p>Security Assessment Report</p>
     </div>
     <ul class="nav-list">
-      <li><a href="#summary">Executive Summary</a></li>
-      <li><a href="#findings">Findings ({{ report.summary.total_failed }})</a></li>
+      <li>
+        <a href="#summary">
+          Executive Summary
+          <span class="sidebar-count sc-default">{{ report.summary.total_failed }}</span>
+        </a>
+      </li>
+      <li>
+        <a href="#findings">
+          Findings
+          {% if report.summary.critical > 0 %}
+          <span class="sidebar-count sc-critical">{{ report.summary.critical }}C</span>
+          {% endif %}
+          {% if report.summary.high > 0 %}
+          <span class="sidebar-count sc-high">{{ report.summary.high }}H</span>
+          {% endif %}
+        </a>
+      </li>
+      <li>
+        <a href="#audit">
+          Controls Audit
+          <span class="sidebar-count sc-default">{{ report.findings | length }}</span>
+        </a>
+      </li>
       <li><a href="#system">System Info</a></li>
       <li><a href="#users">Users &amp; Groups</a></li>
       <li><a href="#network">Network</a></li>
       <li><a href="#services">Services</a></li>
       <li><a href="#software">Software</a></li>
     </ul>
+
+    <div class="theme-toggle-wrap">
+      <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span>Dark Mode</span>
+        <span class="theme-toggle-icon">☽</span>
+      </button>
+    </div>
+
     <div class="sidebar-footer">
-      <p>huginn v{{ report.version }}</p>
+      <p>huginn v{{ report.version }} &bull; {{ report.generated_at_display }}</p>
     </div>
   </nav>
 
@@ -38,40 +67,51 @@
         <h1>{{ report.target_hostname }}</h1>
         <p class="subtitle">{{ report.target_os }} &bull; Assessed {{ report.generated_at_display }}</p>
       </div>
-      <div class="risk-badge risk-{{ risk_level }}">
+      <a href="#findings" class="risk-badge risk-{{ risk_level }}" title="Click to jump to findings">
         <span class="risk-num">{{ report.summary.risk_score }}</span>
         <span class="risk-label">Risk Score</span>
-      </div>
+      </a>
     </header>
 
     <!-- ── Executive Summary ─────────────────────────────────── -->
     <section id="summary" class="section">
       <h2 class="section-title">Executive Summary</h2>
       <div class="summary-cards">
-        <div class="summary-card card-critical">
+        <a class="summary-card card-critical clickable" href="#findings"
+           data-filter="critical" title="Show critical findings">
           <span class="count">{{ report.summary.critical }}</span>
           <span class="label">Critical</span>
-        </div>
-        <div class="summary-card card-high">
+        </a>
+        <a class="summary-card card-high clickable" href="#findings"
+           data-filter="high" title="Show high findings">
           <span class="count">{{ report.summary.high }}</span>
           <span class="label">High</span>
-        </div>
-        <div class="summary-card card-medium">
+        </a>
+        <a class="summary-card card-medium clickable" href="#findings"
+           data-filter="medium" title="Show medium findings">
           <span class="count">{{ report.summary.medium }}</span>
           <span class="label">Medium</span>
-        </div>
-        <div class="summary-card card-low">
+        </a>
+        <a class="summary-card card-low clickable" href="#findings"
+           data-filter="low" title="Show low findings">
           <span class="count">{{ report.summary.low }}</span>
           <span class="label">Low</span>
-        </div>
-        <div class="summary-card card-info">
+        </a>
+        <a class="summary-card card-info clickable" href="#findings"
+           data-filter="info" title="Show informational findings">
           <span class="count">{{ report.summary.info }}</span>
           <span class="label">Info</span>
-        </div>
-        <div class="summary-card card-pass">
+        </a>
+        <a class="summary-card card-pass clickable" href="#audit"
+           title="View controls audit">
           <span class="count">{{ report.summary.passed }}</span>
           <span class="label">Passed</span>
-        </div>
+        </a>
+        <a class="summary-card card-skip clickable" href="#audit"
+           title="View skipped controls">
+          <span class="count">{{ report.summary.skipped }}</span>
+          <span class="label">Skipped</span>
+        </a>
       </div>
     </section>
 
@@ -88,7 +128,7 @@
         </div>
       </div>
 
-      <!-- Findings table -->
+      <!-- Findings table — click a row to jump to its detail card -->
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -97,20 +137,24 @@
               <th data-sort="category" class="sortable">Category</th>
               <th data-sort="rule_id" class="sortable">Rule ID</th>
               <th data-sort="title" class="sortable">Title</th>
+              <th style="width:32px"></th>
             </tr>
           </thead>
           <tbody id="findings-tbody">
             {% for f in report.findings %}
-            {% if not f.passed %}
+            {% if not f.passed and not f.skipped %}
             <tr class="finding-row"
                 data-severity="{{ f.severity }}"
                 data-category="{{ f.category }}"
                 data-rule_id="{{ f.rule_id }}"
-                data-title="{{ f.title }}">
+                data-title="{{ f.title }}"
+                data-card="{{ f.id }}"
+                title="Click to view finding details">
               <td><span class="badge badge-{{ f.severity }}">{{ f.severity_label }}</span></td>
               <td>{{ f.category_label }}</td>
               <td class="mono">{{ f.rule_id }}</td>
               <td>{{ f.title }}</td>
+              <td><span class="row-link-hint">↓</span></td>
             </tr>
             {% endif %}
             {% endfor %}
@@ -119,11 +163,13 @@
       </div>
 
       <!-- Findings detail accordion -->
-      <h3 class="subsection-title">Finding Details</h3>
+      <h3 class="subsection-title" style="margin-top:28px;">Finding Details</h3>
       <div class="findings-detail">
         {% for f in report.findings %}
-        {% if not f.passed %}
-        <div class="finding-card sev-{{ f.severity }}" data-severity="{{ f.severity }}">
+        {% if not f.passed and not f.skipped %}
+        <div class="finding-card sev-{{ f.severity }}"
+             id="card-{{ f.id }}"
+             data-severity="{{ f.severity }}">
           <div class="finding-header">
             <div class="finding-header-left">
               <span class="badge badge-{{ f.severity }}">{{ f.severity_label }}</span>
@@ -131,7 +177,6 @@
             </div>
             <div class="finding-header-right">
               <span class="finding-rule-id">{{ f.rule_id }}</span>
-              <span class="finding-category">{{ f.category_label }}</span>
               <span class="chevron">▼</span>
             </div>
           </div>
@@ -156,10 +201,10 @@
             </div>
             {% if f.references %}
             <div class="finding-section">
-              <h4>References</h4>
+              <h4>Compliance References</h4>
               <div class="ref-tags">
                 {% for ref in f.references %}
-                <span class="ref-tag">{{ ref.framework }}: {{ ref.id }}</span>
+                <span class="ref-tag ref-{{ ref.framework | lower }}">{{ ref.framework }}: {{ ref.id }}</span>
                 {% endfor %}
               </div>
             </div>
@@ -174,6 +219,51 @@
         </div>
         {% endif %}
         {% endfor %}
+      </div>
+    </section>
+
+    <!-- ── Controls Audit ────────────────────────────────────── -->
+    <section id="audit" class="section">
+      <h2 class="section-title">Controls Audit</h2>
+      <p class="section-desc">All security controls evaluated during this assessment. Failed controls appear in the Findings section above.</p>
+      <div class="table-wrap">
+        <table class="data-table audit-table">
+          <thead>
+            <tr>
+              <th style="width:130px">Rule ID</th>
+              <th>Control</th>
+              <th style="width:90px">Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in report.findings %}
+            <tr class="audit-row audit-{{ "pass" if f.passed else ("skip" if f.skipped else "fail") }}">
+              <td class="mono">{{ f.rule_id }}</td>
+              <td>{{ f.title }}</td>
+              <td>
+                {% if f.passed %}
+                <span class="audit-badge audit-pass">PASS</span>
+                {% elif f.skipped %}
+                <span class="audit-badge audit-skip">SKIP</span>
+                {% else %}
+                <span class="audit-badge audit-fail">FAIL</span>
+                {% endif %}
+              </td>
+              <td class="audit-notes">
+                {% if f.passed %}
+                Control satisfied — no action required.
+                {% elif f.skipped %}
+                {{ f.description }}
+                {% else %}
+                <span class="badge badge-{{ f.severity }}">{{ f.severity_label }}</span>
+                <span class="audit-current-val">{{ f.current_value }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -212,6 +302,10 @@
         <div class="info-item">
           <label>Uptime</label>
           <span>{{ report.system_info.os.uptime_seconds // 3600 }}h {{ (report.system_info.os.uptime_seconds % 3600) // 60 }}m</span>
+        </div>
+        <div class="info-item">
+          <label>Collected At</label>
+          <span>{{ report.generated_at_display }}</span>
         </div>
       </div>
     </section>
@@ -379,7 +473,51 @@
       </div>
       {% endif %}
 
-      {% if report.system_info.network.dns_servers %}
+      <!-- DNS — rich resolvectl display if available, fallback to simple list -->
+      {% if report.system_info.network.dns_info %}
+      {% set dns = report.system_info.network.dns_info %}
+      <h3 class="subsection-title">DNS Configuration</h3>
+      <div class="dns-block">
+        <div class="dns-section-header">Global</div>
+        <div class="dns-table">
+          {% if dns.protocols %}
+          <div class="dns-row"><span class="dns-key">Protocols</span><span class="dns-val mono">{{ dns.protocols }}</span></div>
+          {% endif %}
+          {% if dns.resolv_conf_mode %}
+          <div class="dns-row"><span class="dns-key">resolv.conf mode</span><span class="dns-val">{{ dns.resolv_conf_mode }}</span></div>
+          {% endif %}
+          {% if dns.current_dns_server %}
+          <div class="dns-row"><span class="dns-key">Current DNS Server</span><span class="dns-val mono">{{ dns.current_dns_server }}</span></div>
+          {% endif %}
+          {% if dns.dns_servers %}
+          <div class="dns-row"><span class="dns-key">DNS Servers</span><span class="dns-val mono">{{ dns.dns_servers | join(", ") }}</span></div>
+          {% endif %}
+          {% if dns.dns_domain %}
+          <div class="dns-row"><span class="dns-key">DNS Domain</span><span class="dns-val mono">{{ dns.dns_domain }}</span></div>
+          {% endif %}
+        </div>
+        {% for link in dns.links %}
+        <div class="dns-section-header">Link {{ link.index }} ({{ link.name }})</div>
+        <div class="dns-table">
+          {% if link.current_scopes %}
+          <div class="dns-row"><span class="dns-key">Current Scopes</span><span class="dns-val">{{ link.current_scopes }}</span></div>
+          {% endif %}
+          {% if link.protocols %}
+          <div class="dns-row"><span class="dns-key">Protocols</span><span class="dns-val mono">{{ link.protocols }}</span></div>
+          {% endif %}
+          {% if link.current_dns_server %}
+          <div class="dns-row"><span class="dns-key">Current DNS Server</span><span class="dns-val mono">{{ link.current_dns_server }}</span></div>
+          {% endif %}
+          {% if link.dns_servers %}
+          <div class="dns-row"><span class="dns-key">DNS Servers</span><span class="dns-val mono">{{ link.dns_servers | join(", ") }}</span></div>
+          {% endif %}
+          {% if link.dns_domain %}
+          <div class="dns-row"><span class="dns-key">DNS Domain</span><span class="dns-val mono">{{ link.dns_domain }}</span></div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% elif report.system_info.network.dns_servers %}
       <h3 class="subsection-title">DNS Servers</h3>
       <div class="tag-list">
         {% for dns in report.system_info.network.dns_servers %}
@@ -389,49 +527,74 @@
       {% endif %}
     </section>
 
-    <!-- ── Services ───────────────────────────────────────────── -->
+    <!-- ── Services ──────────────────────────────────────────── -->
     <section id="services" class="section">
       <h2 class="section-title">Services</h2>
 
-      <h3 class="subsection-title">Flagged Services</h3>
+      <div class="section-toolbar">
+        <span class="hint-text">{{ report.system_info.services.services | length }} services enumerated</span>
+        <input type="search" id="svc-search" class="search-input" placeholder="Filter services…" oninput="filterServices(this.value)">
+      </div>
+
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table" id="svc-table">
           <thead>
             <tr>
               <th>Service Name</th>
               <th>State</th>
+              <th>Start Type</th>
               <th>Issues</th>
               <th>Binary Path</th>
             </tr>
           </thead>
           <tbody>
             {% for svc in report.system_info.services.services %}
-            {% if svc.unquoted_path or svc.weak_permissions %}
-            <tr>
-              <td>{{ svc.display_name }}</td>
-              <td>{{ svc.state }}</td>
+            <tr class="svc-row{% if svc.unquoted_path or svc.weak_permissions %} svc-flagged{% endif %}">
               <td>
-                {% if svc.unquoted_path %}<span class="badge badge-medium">Unquoted Path</span> {% endif %}
-                {% if svc.weak_permissions %}<span class="badge badge-high">Weak Permissions</span> {% endif %}
+                <span class="svc-display-name">{{ svc.display_name }}</span>
+                {% if svc.name != svc.display_name %}
+                <span class="svc-internal-name mono">{{ svc.name }}</span>
+                {% endif %}
               </td>
-              <td class="mono">{{ svc.binary_path | default("N/A") }}</td>
+              <td>
+                {% if svc.state == "running" %}
+                <span class="badge badge-pass">Running</span>
+                {% elif svc.state == "stopped" %}
+                <span class="badge badge-info">Stopped</span>
+                {% else %}
+                <span class="badge badge-low">{{ svc.state }}</span>
+                {% endif %}
+              </td>
+              <td>{{ svc.start_type }}</td>
+              <td>
+                {% if svc.unquoted_path %}
+                <span class="badge badge-medium">Unquoted Path</span>
+                {% endif %}
+                {% if svc.weak_permissions %}
+                <span class="badge badge-high">Weak Perms</span>
+                {% endif %}
+                {% if not svc.unquoted_path and not svc.weak_permissions %}
+                <span class="badge badge-pass">OK</span>
+                {% endif %}
+              </td>
+              <td class="mono svc-path">{{ svc.binary_path | default("N/A") }}</td>
             </tr>
-            {% endif %}
+            {% else %}
+            <tr><td colspan="5" class="empty-state">No service data available (try running with elevated privileges)</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      <p class="hint-text">Total services enumerated: {{ report.system_info.services.services | length }}</p>
     </section>
 
-    <!-- ── Software ───────────────────────────────────────────── -->
+    <!-- ── Software ──────────────────────────────────────────── -->
     <section id="software" class="section">
       <h2 class="section-title">Software &amp; Security Tools</h2>
 
       <h3 class="subsection-title">AV / EDR Products</h3>
       <div class="tag-list">
         {% for av in report.system_info.software.av_edr_products %}
-        <span class="user-tag">{{ av }}</span>
+        <span class="user-tag av-tag">{{ av }}</span>
         {% else %}
         <span class="badge badge-critical">No AV/EDR products detected</span>
         {% endfor %}
@@ -465,7 +628,7 @@
     <!-- ── Footer ─────────────────────────────────────────────── -->
     <footer class="page-footer">
       <p>Generated by <strong>huginn</strong> v{{ report.version }} on {{ report.generated_at_display }}</p>
-      <p style="margin-top:4px;">This report is confidential and intended for authorized personnel only.</p>
+      <p>This report is confidential and intended for authorized personnel only.</p>
     </footer>
 
   </main>

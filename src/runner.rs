@@ -13,7 +13,6 @@ pub struct RunnerConfig {
     pub output_format: OutputFormat,
     pub quiet: bool,
     pub collectors: Option<Vec<String>>,
-    pub include_passed: bool,
 }
 
 impl RunnerConfig {
@@ -49,11 +48,7 @@ pub fn run_full(config: &RunnerConfig) -> anyhow::Result<()> {
     config.section("Running security analyzers...");
 
     let analyzers = build_analyzer_registry();
-    let mut findings = analyzers.run_all(&system_info, &|msg| config.info(msg));
-
-    if !config.include_passed {
-        findings.retain(|f| !f.passed);
-    }
+    let findings = analyzers.run_all(&system_info, &|msg| config.info(msg));
 
     let report = Report::new(system_info, findings);
 
@@ -111,11 +106,7 @@ pub fn run_analyze(input: &Path, config: &RunnerConfig) -> anyhow::Result<()> {
     config.section("Running security analyzers...");
 
     let analyzers = build_analyzer_registry();
-    let mut findings = analyzers.run_all(&system_info, &|msg| config.info(msg));
-
-    if !config.include_passed {
-        findings.retain(|f| !f.passed);
-    }
+    let findings = analyzers.run_all(&system_info, &|msg| config.info(msg));
 
     let report = Report::new(system_info, findings);
 

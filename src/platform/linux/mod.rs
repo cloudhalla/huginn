@@ -51,6 +51,7 @@ pub fn collect_network(net: &mut NetworkInfo) -> Result<(), HuginnError> {
     net.open_ports = network::list_open_ports();
     net.firewall_profiles = network::get_firewall_status();
     net.dns_servers = etc::read_dns_servers();
+    net.dns_info = network::collect_dns_info();
     Ok(())
 }
 

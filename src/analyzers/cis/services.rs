@@ -16,11 +16,24 @@ impl Analyzer for UnquotedServicePathAnalyzer {
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
+        let services = &info.services.services;
 
-        for svc in &info.services.services {
+        if services.is_empty() {
+            findings.push(Finding::skip(
+                "SVC-UNQUOTED-PATH",
+                "Unquoted service paths — data unavailable",
+                "No service data was collected. Re-run with elevated privileges to enumerate services.",
+                Category::ServiceSecurity,
+            ));
+            return Ok(findings);
+        }
+
+        let mut flagged = 0;
+        for svc in services {
             if !svc.unquoted_path {
                 continue;
             }
+            flagged += 1;
             let path = svc.binary_path.as_deref().unwrap_or("unknown");
             findings.push(
                 Finding::fail(
@@ -48,6 +61,14 @@ impl Analyzer for UnquotedServicePathAnalyzer {
             );
         }
 
+        if flagged == 0 {
+            findings.push(Finding::pass(
+                "SVC-UNQUOTED-PATH",
+                "No services with unquoted binary paths detected",
+                Category::ServiceSecurity,
+            ));
+        }
+
         Ok(findings)
     }
 }
@@ -65,11 +86,24 @@ impl Analyzer for WeakServicePermissionsAnalyzer {
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
+        let services = &info.services.services;
 
-        for svc in &info.services.services {
+        if services.is_empty() {
+            findings.push(Finding::skip(
+                "SVC-WEAK-PERMS",
+                "Service binary permissions — data unavailable",
+                "No service data was collected. Re-run with elevated privileges to enumerate services.",
+                Category::ServiceSecurity,
+            ));
+            return Ok(findings);
+        }
+
+        let mut flagged = 0;
+        for svc in services {
             if !svc.weak_permissions {
                 continue;
             }
+            flagged += 1;
             let path = svc.binary_path.as_deref().unwrap_or("unknown");
             findings.push(
                 Finding::fail(
@@ -99,6 +133,14 @@ impl Analyzer for WeakServicePermissionsAnalyzer {
                 ])
                 .with_evidence(format!("Service: {} | Binary: {}", svc.name, path)),
             );
+        }
+
+        if flagged == 0 {
+            findings.push(Finding::pass(
+                "SVC-WEAK-PERMS",
+                "No services with weak binary permissions detected",
+                Category::ServiceSecurity,
+            ));
         }
 
         Ok(findings)
