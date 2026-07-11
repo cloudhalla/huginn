@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Huginn — {{ report.target_hostname }}</title>
+  <style>{{ css }}</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h1>huginn</h1>
+      <p>Security Assessment</p>
+    </div>
+    <ul class="nav-list">
+      <li><a href="#summary">Executive Summary</a></li>
+      <li><a href="#findings">Findings ({{ report.summary.total_failed }})</a></li>
+      <li><a href="#system">System Info</a></li>
+      <li><a href="#users">Users &amp; Groups</a></li>
+      <li><a href="#network">Network</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#software">Software</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <p>huginn v{{ report.version }}</p>
+    </div>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Page header -->
+    <header class="page-header">
+      <div>
+        <h1>{{ report.target_hostname }}</h1>
+        <p class="subtitle">{{ report.target_os }} &bull; Assessed {{ report.generated_at_display }}</p>
+      </div>
+      <div class="risk-badge risk-{{ risk_level }}">
+        <span class="risk-num">{{ report.summary.risk_score }}</span>
+        <span class="risk-label">Risk Score</span>
+      </div>
+    </header>
+
+    <!-- ── Executive Summary ─────────────────────────────────── -->
+    <section id="summary" class="section">
+      <h2 class="section-title">Executive Summary</h2>
+      <div class="summary-cards">
+        <div class="summary-card card-critical">
+          <span class="count">{{ report.summary.critical }}</span>
+          <span class="label">Critical</span>
+        </div>
+        <div class="summary-card card-high">
+          <span class="count">{{ report.summary.high }}</span>
+          <span class="label">High</span>
+        </div>
+        <div class="summary-card card-medium">
+          <span class="count">{{ report.summary.medium }}</span>
+          <span class="label">Medium</span>
+        </div>
+        <div class="summary-card card-low">
+          <span class="count">{{ report.summary.low }}</span>
+          <span class="label">Low</span>
+        </div>
+        <div class="summary-card card-info">
+          <span class="count">{{ report.summary.info }}</span>
+          <span class="label">Info</span>
+        </div>
+        <div class="summary-card card-pass">
+          <span class="count">{{ report.summary.passed }}</span>
+          <span class="label">Passed</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Findings ──────────────────────────────────────────── -->
+    <section id="findings" class="section">
+      <div class="section-header">
+        <h2 class="section-title">Findings</h2>
+        <div class="filter-bar">
+          <button class="filter-btn active" data-severity="critical">Critical</button>
+          <button class="filter-btn active" data-severity="high">High</button>
+          <button class="filter-btn active" data-severity="medium">Medium</button>
+          <button class="filter-btn active" data-severity="low">Low</button>
+          <button class="filter-btn active" data-severity="info">Info</button>
+        </div>
+      </div>
+
+      <!-- Findings table -->
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th data-sort="severity" class="sortable">Severity ▼</th>
+              <th data-sort="category" class="sortable">Category</th>
+              <th data-sort="rule_id" class="sortable">Rule ID</th>
+              <th data-sort="title" class="sortable">Title</th>
+            </tr>
+          </thead>
+          <tbody id="findings-tbody">
+            {% for f in report.findings %}
+            {% if not f.passed %}
+            <tr class="finding-row"
+                data-severity="{{ f.severity }}"
+                data-category="{{ f.category }}"
+                data-rule_id="{{ f.rule_id }}"
+                data-title="{{ f.title }}">
+              <td><span class="badge badge-{{ f.severity }}">{{ f.severity_label }}</span></td>
+              <td>{{ f.category_label }}</td>
+              <td class="mono">{{ f.rule_id }}</td>
+              <td>{{ f.title }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Findings detail accordion -->
+      <h3 class="subsection-title">Finding Details</h3>
+      <div class="findings-detail">
+        {% for f in report.findings %}
+        {% if not f.passed %}
+        <div class="finding-card sev-{{ f.severity }}" data-severity="{{ f.severity }}">
+          <div class="finding-header">
+            <div class="finding-header-left">
+              <span class="badge badge-{{ f.severity }}">{{ f.severity_label }}</span>
+              <span class="finding-title-text">{{ f.title }}</span>
+            </div>
+            <div class="finding-header-right">
+              <span class="finding-rule-id">{{ f.rule_id }}</span>
+              <span class="finding-category">{{ f.category_label }}</span>
+              <span class="chevron">▼</span>
+            </div>
+          </div>
+          <div class="finding-body">
+            <div class="values-grid">
+              <div class="value-item">
+                <label>Current Value</label>
+                <code>{{ f.current_value }}</code>
+              </div>
+              <div class="value-item">
+                <label>Expected Value</label>
+                <code>{{ f.expected_value }}</code>
+              </div>
+            </div>
+            <div class="finding-section">
+              <h4>Description</h4>
+              <p>{{ f.description }}</p>
+            </div>
+            <div class="finding-section">
+              <h4>Recommendation</h4>
+              <p>{{ f.recommendation }}</p>
+            </div>
+            {% if f.references %}
+            <div class="finding-section">
+              <h4>References</h4>
+              <div class="ref-tags">
+                {% for ref in f.references %}
+                <span class="ref-tag">{{ ref.framework }}: {{ ref.id }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            {% if f.evidence %}
+            <div class="finding-section">
+              <h4>Evidence</h4>
+              <pre class="evidence-block">{{ f.evidence }}</pre>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- ── System Info ────────────────────────────────────────── -->
+    <section id="system" class="section">
+      <h2 class="section-title">System Information</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <label>Hostname</label>
+          <span>{{ report.system_info.os.hostname | default("Unknown") }}</span>
+        </div>
+        <div class="info-item">
+          <label>Operating System</label>
+          <span>{{ report.system_info.os.name | default("Unknown") }}</span>
+        </div>
+        <div class="info-item">
+          <label>Version</label>
+          <span>{{ report.system_info.os.version | default("N/A") }}</span>
+        </div>
+        {% if report.system_info.os.build %}
+        <div class="info-item">
+          <label>Build</label>
+          <span>{{ report.system_info.os.build }}</span>
+        </div>
+        {% endif %}
+        <div class="info-item">
+          <label>Architecture</label>
+          <span>{{ report.system_info.os.architecture | default("Unknown") }}</span>
+        </div>
+        {% if report.system_info.os.domain %}
+        <div class="info-item">
+          <label>Domain</label>
+          <span>{{ report.system_info.os.domain }}</span>
+        </div>
+        {% endif %}
+        <div class="info-item">
+          <label>Uptime</label>
+          <span>{{ report.system_info.os.uptime_seconds // 3600 }}h {{ (report.system_info.os.uptime_seconds % 3600) // 60 }}m</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Users & Groups ─────────────────────────────────────── -->
+    <section id="users" class="section">
+      <h2 class="section-title">Users &amp; Groups</h2>
+
+      <h3 class="subsection-title">Administrator Group Members</h3>
+      <div class="tag-list">
+        {% for member in report.system_info.users.admin_group_members %}
+        <span class="user-tag admin-tag">{{ member }}</span>
+        {% else %}
+        <span class="empty-state">No members found (try running with elevated privileges)</span>
+        {% endfor %}
+      </div>
+
+      <h3 class="subsection-title">Password Policy</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <tbody>
+            <tr>
+              <td>Minimum Length</td>
+              <td>{% if report.system_info.users.password_policy.min_length %}{{ report.system_info.users.password_policy.min_length }} characters{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Maximum Age</td>
+              <td>{% if report.system_info.users.password_policy.max_age_days %}{{ report.system_info.users.password_policy.max_age_days }} days{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Minimum Age</td>
+              <td>{% if report.system_info.users.password_policy.min_age_days %}{{ report.system_info.users.password_policy.min_age_days }} days{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Password History</td>
+              <td>{% if report.system_info.users.password_policy.history_count %}{{ report.system_info.users.password_policy.history_count }} passwords{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Complexity Required</td>
+              <td>{% if report.system_info.users.password_policy.complexity_required is defined %}{% if report.system_info.users.password_policy.complexity_required %}<span class="badge badge-pass">Yes</span>{% else %}<span class="badge badge-high">No</span>{% endif %}{% else %}Not configured{% endif %}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subsection-title">Lockout Policy</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <tbody>
+            <tr>
+              <td>Lockout Threshold</td>
+              <td>{% if report.system_info.users.lockout_policy.threshold %}{{ report.system_info.users.lockout_policy.threshold }} invalid attempts{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Lockout Duration</td>
+              <td>{% if report.system_info.users.lockout_policy.duration_minutes %}{{ report.system_info.users.lockout_policy.duration_minutes }} minutes{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <td>Observation Window</td>
+              <td>{% if report.system_info.users.lockout_policy.observation_window_minutes %}{{ report.system_info.users.lockout_policy.observation_window_minutes }} minutes{% else %}Not configured{% endif %}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subsection-title">Local Users ({{ report.system_info.users.users | length }})</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>UID</th>
+              <th>Enabled</th>
+              <th>Admin</th>
+              <th>Password Expires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in report.system_info.users.users %}
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.uid | default("N/A") }}</td>
+              <td>{% if user.enabled %}<span class="badge badge-pass">Yes</span>{% else %}<span class="badge badge-info">No</span>{% endif %}</td>
+              <td>{% if user.is_admin %}<span class="badge badge-high">Admin</span>{% else %}No{% endif %}</td>
+              <td>{{ "Yes" if user.password_expires else "No" }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="empty-state">No users found (insufficient privileges?)</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Network ────────────────────────────────────────────── -->
+    <section id="network" class="section">
+      <h2 class="section-title">Network</h2>
+
+      <h3 class="subsection-title">Firewall Status</h3>
+      {% for profile in report.system_info.network.firewall_profiles %}
+      <div class="fw-row">
+        <strong>{{ profile.name }}</strong>
+        {% if profile.enabled %}
+        <span class="badge badge-pass">ENABLED</span>
+        {% else %}
+        <span class="badge badge-critical">DISABLED</span>
+        {% endif %}
+        <span class="fw-details">Inbound: {{ profile.inbound_default }} | Outbound: {{ profile.outbound_default }}</span>
+      </div>
+      {% else %}
+      <p class="empty-state">No firewall data available (try running with elevated privileges)</p>
+      {% endfor %}
+
+      <h3 class="subsection-title">Network Interfaces ({{ report.system_info.network.interfaces | length }})</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>IP Addresses</th>
+              <th>MAC Address</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for iface in report.system_info.network.interfaces %}
+            <tr>
+              <td>{{ iface.name }}</td>
+              <td>{{ iface.ip_addresses | join(", ") | default("N/A") }}</td>
+              <td class="mono">{{ iface.mac_address | default("N/A") }}</td>
+              <td>{% if iface.is_up %}<span class="badge badge-pass">UP</span>{% else %}<span class="badge badge-info">DOWN</span>{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="empty-state">No interface data available</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if report.system_info.network.open_ports %}
+      <h3 class="subsection-title">Listening Ports ({{ report.system_info.network.open_ports | length }})</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Protocol</th>
+              <th>Address</th>
+              <th>Port</th>
+              <th>State</th>
+              <th>Process</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for port in report.system_info.network.open_ports %}
+            <tr>
+              <td>{{ port.protocol }}</td>
+              <td class="mono">{{ port.local_addr }}</td>
+              <td>{{ port.local_port }}</td>
+              <td>{{ port.state }}</td>
+              <td>{{ port.process_name | default("N/A") }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if report.system_info.network.dns_servers %}
+      <h3 class="subsection-title">DNS Servers</h3>
+      <div class="tag-list">
+        {% for dns in report.system_info.network.dns_servers %}
+        <span class="user-tag">{{ dns }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- ── Services ───────────────────────────────────────────── -->
+    <section id="services" class="section">
+      <h2 class="section-title">Services</h2>
+
+      <h3 class="subsection-title">Flagged Services</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Service Name</th>
+              <th>State</th>
+              <th>Issues</th>
+              <th>Binary Path</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for svc in report.system_info.services.services %}
+            {% if svc.unquoted_path or svc.weak_permissions %}
+            <tr>
+              <td>{{ svc.display_name }}</td>
+              <td>{{ svc.state }}</td>
+              <td>
+                {% if svc.unquoted_path %}<span class="badge badge-medium">Unquoted Path</span> {% endif %}
+                {% if svc.weak_permissions %}<span class="badge badge-high">Weak Permissions</span> {% endif %}
+              </td>
+              <td class="mono">{{ svc.binary_path | default("N/A") }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hint-text">Total services enumerated: {{ report.system_info.services.services | length }}</p>
+    </section>
+
+    <!-- ── Software ───────────────────────────────────────────── -->
+    <section id="software" class="section">
+      <h2 class="section-title">Software &amp; Security Tools</h2>
+
+      <h3 class="subsection-title">AV / EDR Products</h3>
+      <div class="tag-list">
+        {% for av in report.system_info.software.av_edr_products %}
+        <span class="user-tag">{{ av }}</span>
+        {% else %}
+        <span class="badge badge-critical">No AV/EDR products detected</span>
+        {% endfor %}
+      </div>
+
+      {% if report.system_info.software.installed_software %}
+      <h3 class="subsection-title">Installed Software ({{ report.system_info.software.installed_software | length }} packages)</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Version</th>
+              <th>Vendor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sw in report.system_info.software.installed_software %}
+            <tr>
+              <td>{{ sw.name }}</td>
+              <td>{{ sw.version | default("N/A") }}</td>
+              <td>{{ sw.vendor | default("N/A") }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- ── Footer ─────────────────────────────────────────────── -->
+    <footer class="page-footer">
+      <p>Generated by <strong>huginn</strong> v{{ report.version }} on {{ report.generated_at_display }}</p>
+      <p style="margin-top:4px;">This report is confidential and intended for authorized personnel only.</p>
+    </footer>
+
+  </main>
+</div>
+<script>{{ js }}</script>
+</body>
+</html>

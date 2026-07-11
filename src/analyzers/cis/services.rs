@@ -1,0 +1,106 @@
+use crate::analyzers::Analyzer;
+use crate::error::HuginnError;
+use crate::models::finding::{Category, ComplianceRef, Finding, Severity};
+use crate::models::system_info::SystemInfo;
+
+pub struct UnquotedServicePathAnalyzer;
+
+impl Analyzer for UnquotedServicePathAnalyzer {
+    fn id(&self) -> &'static str {
+        "cis-5.svc.unquoted"
+    }
+
+    fn name(&self) -> &'static str {
+        "Service — Unquoted Binary Paths"
+    }
+
+    fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
+        let mut findings = Vec::new();
+
+        for svc in &info.services.services {
+            if !svc.unquoted_path {
+                continue;
+            }
+            let path = svc.binary_path.as_deref().unwrap_or("unknown");
+            findings.push(
+                Finding::fail(
+                    "SVC-UNQUOTED-PATH",
+                    format!("Service '{}' has an unquoted binary path with spaces", svc.display_name),
+                    Severity::Medium,
+                    Category::ServiceSecurity,
+                    "When a service binary path contains spaces and is not quoted, Windows \
+                     will attempt to execute each space-separated segment as a potential binary \
+                     path before reaching the real one. An attacker who can write to an \
+                     intermediate directory can place a malicious binary that runs as SYSTEM.",
+                    format!("Unquoted path: {}", path),
+                    "Quoted path: \"C:\\Path With Spaces\\service.exe\"",
+                    format!(
+                        "Wrap the binary path in double quotes for service '{}'. \
+                         Modify via: sc config \"{}\" binpath= \"\\\"{}\\\"\"",
+                        svc.name, svc.name, path
+                    ),
+                )
+                .with_refs(vec![ComplianceRef::nist(
+                    "NIST CM-7",
+                    "Least Functionality",
+                )])
+                .with_evidence(format!("Service: {} | Path: {}", svc.name, path)),
+            );
+        }
+
+        Ok(findings)
+    }
+}
+
+pub struct WeakServicePermissionsAnalyzer;
+
+impl Analyzer for WeakServicePermissionsAnalyzer {
+    fn id(&self) -> &'static str {
+        "cis-5.svc.permissions"
+    }
+
+    fn name(&self) -> &'static str {
+        "Service — Weak Binary Permissions"
+    }
+
+    fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
+        let mut findings = Vec::new();
+
+        for svc in &info.services.services {
+            if !svc.weak_permissions {
+                continue;
+            }
+            let path = svc.binary_path.as_deref().unwrap_or("unknown");
+            findings.push(
+                Finding::fail(
+                    "SVC-WEAK-PERMS",
+                    format!(
+                        "Service '{}' binary has weak permissions (world-writable)",
+                        svc.display_name
+                    ),
+                    Severity::High,
+                    Category::ServiceSecurity,
+                    "A service binary or its parent directory is writable by non-administrative \
+                     users. An attacker with local user access can replace the binary with \
+                     a malicious executable that runs with the service's privileges (often SYSTEM).",
+                    format!("Weak ACL on: {}", path),
+                    "Only SYSTEM and Administrators have write access",
+                    format!(
+                        "Restrict write permissions on '{}' and its parent directories to \
+                         SYSTEM and Administrators only. Use icacls to inspect and fix: \
+                         icacls \"{}\" /inheritance:d /grant:r \"SYSTEM:(F)\" \
+                         \"Administrators:(F)\"",
+                        path, path
+                    ),
+                )
+                .with_refs(vec![
+                    ComplianceRef::cis("CIS WS2022 5.x", "Ensure service binary ACLs are configured correctly"),
+                    ComplianceRef::nist("NIST CM-6", "Configuration Settings"),
+                ])
+                .with_evidence(format!("Service: {} | Binary: {}", svc.name, path)),
+            );
+        }
+
+        Ok(findings)
+    }
+}

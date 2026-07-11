@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build *)",
+      "Bash(rustup toolchain *)",
+      "Bash(rustup show *)",
+      "Bash(rustup update *)",
+      "Bash(cargo run *)",
+      "Bash(python3 -m json.tool --no-ensure-ascii)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}
