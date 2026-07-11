@@ -330,3 +330,130 @@ impl Analyzer for SmbV1Analyzer {
         Ok(findings)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::Analyzer;
+    use crate::models::finding::Severity;
+    use crate::models::system_info::{FirewallProfile, SystemInfo};
+
+    fn fw(name: &str, enabled: bool, inbound: &str) -> FirewallProfile {
+        FirewallProfile {
+            name: name.to_string(),
+            enabled,
+            inbound_default: inbound.to_string(),
+            outbound_default: "allow".to_string(),
+        }
+    }
+
+    #[test]
+    fn smb_v1_none_skips() {
+        let findings = SmbV1Analyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().any(|f| f.skipped));
+    }
+
+    #[test]
+    fn smb_v1_enabled_fails_critical() {
+        let mut info = SystemInfo::default();
+        info.security.smb_v1_enabled = Some(true);
+        let findings = SmbV1Analyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-18.3.3").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn smb_v1_disabled_passes() {
+        let mut info = SystemInfo::default();
+        info.security.smb_v1_enabled = Some(false);
+        let findings = SmbV1Analyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-18.3.3").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn linux_firewall_no_profiles_skips() {
+        let findings = LinuxFirewallAnalyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().any(|f| f.skipped));
+    }
+
+    #[test]
+    fn linux_firewall_ufw_active_passes() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("ufw", true, "deny")];
+        let findings = LinuxFirewallAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "FW-1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn linux_firewall_ufw_inactive_fails_critical() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("ufw", false, "")];
+        let findings = LinuxFirewallAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "FW-1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn linux_firewall_iptables_active_passes() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("iptables", true, "drop")];
+        let findings = LinuxFirewallAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "FW-2").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn linux_firewall_iptables_no_rules_fails_high() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("iptables", false, "")];
+        let findings = LinuxFirewallAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "FW-2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn windows_firewall_no_profiles_skips() {
+        let findings = WindowsFirewallAnalyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().any(|f| f.skipped));
+    }
+
+    #[test]
+    fn windows_firewall_public_disabled_fails_critical() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("Public", false, "block")];
+        let findings = WindowsFirewallAnalyzer.analyze(&info).unwrap();
+        let failed = findings.iter().find(|f| !f.passed && !f.skipped).unwrap();
+        assert_eq!(failed.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn windows_firewall_domain_disabled_fails_high() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("Domain", false, "block")];
+        let findings = WindowsFirewallAnalyzer.analyze(&info).unwrap();
+        let failed = findings.iter().find(|f| !f.passed && !f.skipped).unwrap();
+        assert_eq!(failed.severity, Severity::High);
+    }
+
+    #[test]
+    fn windows_firewall_enabled_deny_inbound_passes() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("Domain", true, "block")];
+        let findings = WindowsFirewallAnalyzer.analyze(&info).unwrap();
+        assert!(findings.iter().any(|f| f.passed));
+    }
+
+    #[test]
+    fn windows_firewall_enabled_allow_inbound_fails_high() {
+        let mut info = SystemInfo::default();
+        info.network.firewall_profiles = vec![fw("Domain", true, "allow")];
+        let findings = WindowsFirewallAnalyzer.analyze(&info).unwrap();
+        let failed = findings.iter().find(|f| !f.passed && !f.skipped).unwrap();
+        assert_eq!(failed.severity, Severity::High);
+    }
+}

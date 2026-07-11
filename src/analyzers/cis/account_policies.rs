@@ -346,3 +346,166 @@ impl Analyzer for LockoutPolicyAnalyzer {
         Ok(findings)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::Analyzer;
+    use crate::models::finding::Severity;
+    use crate::models::system_info::{LockoutPolicy, PasswordPolicy, SystemInfo};
+
+    fn info_with_pw(policy: PasswordPolicy) -> SystemInfo {
+        let mut info = SystemInfo::default();
+        info.users.password_policy = policy;
+        info
+    }
+
+    fn info_with_lockout(policy: LockoutPolicy) -> SystemInfo {
+        let mut info = SystemInfo::default();
+        info.users.lockout_policy = policy;
+        info
+    }
+
+    #[test]
+    fn password_policy_none_produces_skips() {
+        let findings = PasswordPolicyAnalyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().filter(|f| f.skipped).count() >= 4);
+    }
+
+    #[test]
+    fn password_min_length_below_14_fails_high() {
+        let info = info_with_pw(PasswordPolicy { min_length: Some(8), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn password_min_length_14_passes() {
+        let info = info_with_pw(PasswordPolicy { min_length: Some(14), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn password_max_age_zero_fails_medium() {
+        let info = info_with_pw(PasswordPolicy { max_age_days: Some(0), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn password_max_age_over_365_fails_low() {
+        let info = info_with_pw(PasswordPolicy { max_age_days: Some(366), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn password_max_age_365_passes() {
+        let info = info_with_pw(PasswordPolicy { max_age_days: Some(365), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.2").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn password_history_below_24_fails_medium() {
+        let info = info_with_pw(PasswordPolicy { history_count: Some(5), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.3").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn password_history_24_passes() {
+        let info = info_with_pw(PasswordPolicy { history_count: Some(24), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.3").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn password_complexity_disabled_fails_high() {
+        let info = info_with_pw(PasswordPolicy { complexity_required: Some(false), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.4").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn password_complexity_enabled_passes() {
+        let info = info_with_pw(PasswordPolicy { complexity_required: Some(true), ..Default::default() });
+        let findings = PasswordPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.1.4").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn lockout_threshold_zero_fails_high() {
+        let info = info_with_lockout(LockoutPolicy { threshold: Some(0), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn lockout_threshold_over_5_fails_medium() {
+        let info = info_with_lockout(LockoutPolicy { threshold: Some(10), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn lockout_threshold_5_passes() {
+        let info = info_with_lockout(LockoutPolicy { threshold: Some(5), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn lockout_duration_below_15_fails_low() {
+        let info = info_with_lockout(LockoutPolicy { duration_minutes: Some(5), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn lockout_duration_15_passes() {
+        let info = info_with_lockout(LockoutPolicy { duration_minutes: Some(15), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.2").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn lockout_window_below_15_fails_low() {
+        let info = info_with_lockout(LockoutPolicy { observation_window_minutes: Some(10), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.3").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn lockout_window_15_passes() {
+        let info = info_with_lockout(LockoutPolicy { observation_window_minutes: Some(15), ..Default::default() });
+        let findings = LockoutPolicyAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "CIS-1.2.3").unwrap();
+        assert!(f.passed);
+    }
+}

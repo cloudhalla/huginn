@@ -231,3 +231,147 @@ impl Analyzer for SshHardeningAnalyzer {
         Ok(findings)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::Analyzer;
+    use crate::models::finding::Severity;
+    use crate::models::system_info::SystemInfo;
+
+    fn info_with_ssh(cfg: &[(&str, &str)]) -> SystemInfo {
+        let mut info = SystemInfo::default();
+        info.security.ssh_config = cfg
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        info
+    }
+
+    #[test]
+    fn empty_ssh_config_skips() {
+        let findings = SshHardeningAnalyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().any(|f| f.skipped && f.rule_id == "SSH-HARDENING"));
+    }
+
+    #[test]
+    fn root_login_yes_fails_critical() {
+        let info = info_with_ssh(&[("permitrootlogin", "yes")]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn root_login_no_passes() {
+        let info = info_with_ssh(&[("permitrootlogin", "no")]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn root_login_prohibit_password_passes() {
+        let info = info_with_ssh(&[("permitrootlogin", "prohibit-password")]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn password_auth_yes_fails_high() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("passwordauthentication", "yes"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn password_auth_no_passes() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("passwordauthentication", "no"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-2").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn empty_passwords_yes_fails_critical() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("permitemptypasswords", "yes"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-3").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn x11_forwarding_yes_fails_low() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("x11forwarding", "yes"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-4").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn max_auth_tries_over_4_fails_low() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("maxauthtries", "6"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-5").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn max_auth_tries_4_passes() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("maxauthtries", "4"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-5").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn use_pam_no_fails_medium() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("usepam", "no"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "SSH-6").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn fully_hardened_config_all_pass() {
+        let info = info_with_ssh(&[
+            ("permitrootlogin", "no"),
+            ("passwordauthentication", "no"),
+            ("permitemptypasswords", "no"),
+            ("x11forwarding", "no"),
+            ("maxauthtries", "4"),
+            ("usepam", "yes"),
+        ]);
+        let findings = SshHardeningAnalyzer.analyze(&info).unwrap();
+        assert!(findings.iter().all(|f| f.passed || f.skipped));
+    }
+}

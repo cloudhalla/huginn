@@ -214,3 +214,96 @@ impl Finding {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn severity_weights_are_ordered() {
+        assert!(Severity::Critical.weight() > Severity::High.weight());
+        assert!(Severity::High.weight() > Severity::Medium.weight());
+        assert!(Severity::Medium.weight() > Severity::Low.weight());
+        assert!(Severity::Low.weight() > Severity::Info.weight());
+    }
+
+    #[test]
+    fn severity_labels_are_correct() {
+        assert_eq!(Severity::Critical.label(), "CRITICAL");
+        assert_eq!(Severity::High.label(), "HIGH");
+        assert_eq!(Severity::Medium.label(), "MEDIUM");
+        assert_eq!(Severity::Low.label(), "LOW");
+        assert_eq!(Severity::Info.label(), "INFO");
+    }
+
+    #[test]
+    fn fail_creates_failed_finding() {
+        let f = Finding::fail(
+            "TEST-1", "Title", Severity::High, Category::NetworkSecurity,
+            "desc", "current", "expected", "rec",
+        );
+        assert!(!f.passed);
+        assert!(!f.skipped);
+        assert_eq!(f.rule_id, "TEST-1");
+        assert_eq!(f.severity, Severity::High);
+        assert_eq!(f.severity_label, "HIGH");
+        assert_eq!(f.current_value, "current");
+        assert_eq!(f.expected_value, "expected");
+        assert!(f.references.is_empty());
+        assert!(f.evidence.is_none());
+    }
+
+    #[test]
+    fn pass_creates_passed_finding() {
+        let f = Finding::pass("TEST-2", "Title", Category::AccountPolicy);
+        assert!(f.passed);
+        assert!(!f.skipped);
+        assert_eq!(f.severity, Severity::Info);
+    }
+
+    #[test]
+    fn skip_creates_skipped_finding() {
+        let f = Finding::skip("TEST-3", "Title", "reason", Category::ServiceSecurity);
+        assert!(!f.passed);
+        assert!(f.skipped);
+        assert_eq!(f.severity, Severity::Info);
+        assert_eq!(f.description, "reason");
+    }
+
+    #[test]
+    fn with_refs_attaches_compliance_refs() {
+        let f = Finding::fail(
+            "TEST-4", "Title", Severity::Low, Category::FirewallPolicy,
+            "d", "c", "e", "r",
+        )
+        .with_refs(vec![ComplianceRef::cis("1.1", "Title")]);
+        assert_eq!(f.references.len(), 1);
+        assert_eq!(f.references[0].framework, "CIS");
+    }
+
+    #[test]
+    fn with_evidence_attaches_evidence() {
+        let f = Finding::fail(
+            "TEST-5", "Title", Severity::Medium, Category::SystemIntegrity,
+            "d", "c", "e", "r",
+        )
+        .with_evidence("evidence string");
+        assert_eq!(f.evidence.as_deref(), Some("evidence string"));
+    }
+
+    #[test]
+    fn compliance_ref_cis_sets_framework_and_url() {
+        let r = ComplianceRef::cis("1.2.3", "Some control");
+        assert_eq!(r.framework, "CIS");
+        assert_eq!(r.id, "1.2.3");
+        assert_eq!(r.title, "Some control");
+        assert!(r.url.is_some());
+    }
+
+    #[test]
+    fn compliance_ref_nist_has_no_url() {
+        let r = ComplianceRef::nist("IA-5", "Authenticator Management");
+        assert_eq!(r.framework, "NIST");
+        assert!(r.url.is_none());
+    }
+}

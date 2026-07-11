@@ -366,3 +366,130 @@ impl Analyzer for KernelHardeningAnalyzer {
         Ok(findings)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::Analyzer;
+    use crate::models::finding::Severity;
+    use crate::models::system_info::SystemInfo;
+
+    fn info_with_params(params: &[(&str, &str)]) -> SystemInfo {
+        let mut info = SystemInfo::default();
+        info.security.kernel_params = params
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        info
+    }
+
+    #[test]
+    fn empty_kernel_params_skips() {
+        let findings = KernelHardeningAnalyzer.analyze(&SystemInfo::default()).unwrap();
+        assert!(findings.iter().any(|f| f.skipped && f.rule_id == "KERNEL-HARDENING"));
+    }
+
+    #[test]
+    fn aslr_not_2_fails_high() {
+        let info = info_with_params(&[("kernel/randomize_va_space", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-1").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn aslr_2_passes() {
+        let info = info_with_params(&[("kernel/randomize_va_space", "2")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-1").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn dmesg_restrict_0_fails_low() {
+        let info = info_with_params(&[("kernel/dmesg_restrict", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-2").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn dmesg_restrict_1_passes() {
+        let info = info_with_params(&[("kernel/dmesg_restrict", "1")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-2").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn kptr_restrict_not_2_fails_medium() {
+        let info = info_with_params(&[("kernel/kptr_restrict", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-3").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn ip_forward_enabled_fails_medium() {
+        let info = info_with_params(&[("net/ipv4/ip_forward", "1")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-5").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn ip_forward_disabled_passes() {
+        let info = info_with_params(&[("net/ipv4/ip_forward", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-5").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn tcp_syncookies_disabled_fails_medium() {
+        let info = info_with_params(&[("net/ipv4/tcp_syncookies", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-6").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn rp_filter_0_fails_medium() {
+        let info = info_with_params(&[("net/ipv4/conf/all/rp_filter", "0")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-10").unwrap();
+        assert!(!f.passed && !f.skipped);
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn rp_filter_1_passes() {
+        let info = info_with_params(&[("net/ipv4/conf/all/rp_filter", "1")]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        let f = findings.iter().find(|f| f.rule_id == "KERNEL-10").unwrap();
+        assert!(f.passed);
+    }
+
+    #[test]
+    fn fully_hardened_kernel_all_pass() {
+        let info = info_with_params(&[
+            ("kernel/randomize_va_space", "2"),
+            ("kernel/dmesg_restrict", "1"),
+            ("kernel/kptr_restrict", "2"),
+            ("fs/suid_dumpable", "0"),
+            ("net/ipv4/ip_forward", "0"),
+            ("net/ipv4/tcp_syncookies", "1"),
+            ("net/ipv4/conf/all/accept_redirects", "0"),
+            ("net/ipv4/conf/all/accept_source_route", "0"),
+            ("net/ipv4/conf/all/log_martians", "1"),
+            ("net/ipv4/conf/all/rp_filter", "1"),
+        ]);
+        let findings = KernelHardeningAnalyzer.analyze(&info).unwrap();
+        assert!(findings.iter().all(|f| f.passed || f.skipped));
+    }
+}
