@@ -176,14 +176,9 @@ impl Analyzer for PasswordPolicyAnalyzer {
             )),
         }
 
-        // CIS 1.1.5 — Reversible encryption disabled (Windows only)
-        match policy.reversible_encryption {
-            None => findings.push(Finding::skip(
-                "CIS-1.1.5",
-                "Reversible password encryption — data unavailable",
-                "This setting is Windows-specific and could not be collected on this platform.",
-                Category::AccountPolicy,
-            )),
+        // CIS 1.1.5 — Reversible encryption disabled (Windows only, skip silently on Linux)
+        if std::env::consts::OS == "windows" { match policy.reversible_encryption {
+            None => {}
             Some(true) => findings.push(
                 Finding::fail(
                     "CIS-1.1.5",
@@ -212,7 +207,7 @@ impl Analyzer for PasswordPolicyAnalyzer {
                 "Reversible password encryption is disabled",
                 Category::AccountPolicy,
             )),
-        }
+        } } // end match + if windows
 
         Ok(findings)
     }

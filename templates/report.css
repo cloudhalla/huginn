@@ -287,9 +287,11 @@ a, button, .filter-btn, .chevron, .finding-card.expanded .finding-body { transit
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 11px;
   margin-bottom: 18px;
   gap: 16px;
   flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
 }
 .section-header .section-title { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
 
@@ -302,14 +304,24 @@ a, button, .filter-btn, .chevron, .finding-card.expanded .finding-body { transit
   letter-spacing: 0.08em;
 }
 
+/* ── Executive Summary — full-bleed banner ────────────────────── */
+#summary {
+  margin-left: -44px;
+  margin-right: -44px;
+  padding: 0 44px 36px;
+  margin-bottom: 52px;
+  scroll-margin-top: 0;
+}
+#summary .section-title { padding-top: 28px; }
+
 /* ── Summary cards ────────────────────────────────────────────── */
-.summary-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+.summary-cards { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
 
 .summary-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 20px 12px 16px;
+  padding: 24px 16px 20px;
   text-align: center;
   border-top: 3px solid var(--border);
   position: relative;
@@ -329,7 +341,7 @@ a, button, .filter-btn, .chevron, .finding-card.expanded .finding-body { transit
 .summary-card.clickable:hover .label { color: var(--text); }
 .summary-card.clickable:active { transform: translateY(0); }
 
-.summary-card .count { display: block; font-size: 36px; font-weight: 700; line-height: 1; }
+.summary-card .count { display: block; font-size: 40px; font-weight: 700; line-height: 1; }
 .summary-card .label { display: block; font-size: 11px; color: var(--text-subtle); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .card-critical { border-top-color: var(--critical); color: var(--critical); }
@@ -360,7 +372,7 @@ a, button, .filter-btn, .chevron, .finding-card.expanded .finding-body { transit
 .badge-pass     { background: var(--pass-a);      color: var(--pass);     border-color: rgba(163,190,140,0.30); }
 
 /* ── Filter bar ───────────────────────────────────────────────── */
-.filter-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-bar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 16px; }
 
 .filter-btn {
   padding: 5px 13px;
@@ -619,6 +631,20 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .audit-notes { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .audit-current-val { margin-left: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; color: var(--text-muted); }
 
+.os-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.os-linux   { background: rgba(136,192,208,0.12); color: var(--accent);      border: 1px solid rgba(136,192,208,0.25); }
+.os-windows { background: rgba(163,190,140,0.12); color: var(--pass);        border: 1px solid rgba(163,190,140,0.25); }
+.os-any     { background: var(--surface-2);       color: var(--text-subtle); border: 1px solid var(--border); }
+
 /* ── Services table ───────────────────────────────────────────── */
 .svc-flagged td { background: rgba(208, 135, 112, 0.04); }
 .svc-flagged:hover td { background: rgba(208, 135, 112, 0.08) !important; }
@@ -675,8 +701,9 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 1000px) {
-  .summary-cards { grid-template-columns: repeat(4, 1fr); }
   .main { padding: 0 28px 56px; }
+  #summary { margin-left: -28px; margin-right: -28px; padding-left: 28px; padding-right: 28px; }
+  .summary-cards { grid-template-columns: repeat(4, 1fr); }
   .dns-row { grid-template-columns: 160px 1fr; }
 }
 
@@ -684,6 +711,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .app { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .main { padding: 0 16px 40px; }
+  #summary { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .values-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: flex-start; }

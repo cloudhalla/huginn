@@ -178,6 +178,9 @@ fn build_analyzer_registry() -> AnalyzerRegistry {
         .register(crate::analyzers::cis::security_options::LsaProtectionAnalyzer)
         .register(crate::analyzers::cis::services::UnquotedServicePathAnalyzer)
         .register(crate::analyzers::cis::services::WeakServicePermissionsAnalyzer)
-        .register(crate::analyzers::cis::network::FirewallAnalyzer)
+        .register(crate::analyzers::cis::network::WindowsFirewallAnalyzer)
+        .register(crate::analyzers::cis::network::LinuxFirewallAnalyzer)
         .register(crate::analyzers::cis::network::SmbV1Analyzer)
+        .register(crate::analyzers::cis::ssh::SshHardeningAnalyzer)
+        .register(crate::analyzers::cis::kernel::KernelHardeningAnalyzer)
 }

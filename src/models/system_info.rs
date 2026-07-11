@@ -214,6 +214,12 @@ pub struct SecurityPolicies {
     pub powershell_transcription: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitlocker_status: Option<String>,
+    /// Key → value map of sshd_config settings (lowercase keys)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub ssh_config: HashMap<String, String>,
+    /// Key → value map of /proc/sys kernel parameter readings
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub kernel_params: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

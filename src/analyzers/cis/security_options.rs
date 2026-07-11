@@ -1,4 +1,4 @@
-use crate::analyzers::Analyzer;
+use crate::analyzers::{Analyzer, OsTarget};
 use crate::error::HuginnError;
 use crate::models::finding::{Category, ComplianceRef, Finding, Severity};
 use crate::models::system_info::SystemInfo;
@@ -13,6 +13,8 @@ impl Analyzer for UacAnalyzer {
     fn name(&self) -> &'static str {
         "CIS §2.3.7 — User Account Control (UAC)"
     }
+
+    fn target_os(&self) -> OsTarget { OsTarget::Windows }
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
@@ -143,6 +145,8 @@ impl Analyzer for LsaProtectionAnalyzer {
     fn name(&self) -> &'static str {
         "CIS §2.3.11 — LSA Protection"
     }
+
+    fn target_os(&self) -> OsTarget { OsTarget::Windows }
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();

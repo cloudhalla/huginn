@@ -198,29 +198,29 @@ document.querySelectorAll('.nav-list a').forEach(link => {
 
 // ── Highlight active nav section on scroll ──────────────────────
 
-const sections  = document.querySelectorAll('section[id]');
-const navLinks  = document.querySelectorAll('.nav-list a');
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-list a');
 
-const sectionObserver = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      navLinks.forEach(link => link.classList.remove('active'));
-      const active = document.querySelector(`.nav-list a[href="#${entry.target.id}"]`);
-      if (active) active.classList.add('active');
+function updateActiveNav() {
+  // Find the last section whose top edge is at or above 120px from the viewport top.
+  // This fires the highlight as soon as the section title scrolls into view,
+  // not when the previous section leaves.
+  const threshold = 120;
+  let current = sections[0];
+  sections.forEach(section => {
+    if (section.getBoundingClientRect().top <= threshold) {
+      current = section;
     }
   });
-}, { threshold: 0.05, rootMargin: '-10% 0px -55% 0px' });
-
-sections.forEach(s => sectionObserver.observe(s));
-
-// When the page is scrolled to the bottom, force-highlight the last nav link
-window.addEventListener('scroll', () => {
-  const atBottom = (window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 8;
-  if (atBottom) {
-    navLinks.forEach(link => link.classList.remove('active'));
-    if (navLinks.length > 0) navLinks[navLinks.length - 1].classList.add('active');
+  navLinks.forEach(link => link.classList.remove('active'));
+  if (current) {
+    const active = document.querySelector(`.nav-list a[href="#${current.id}"]`);
+    if (active) active.classList.add('active');
   }
-}, { passive: true });
+}
+
+window.addEventListener('scroll', updateActiveNav, { passive: true });
+updateActiveNav();
 
 // ── Init ────────────────────────────────────────────────────────
 

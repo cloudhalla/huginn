@@ -1,6 +1,7 @@
 pub mod etc;
 pub mod network;
 pub mod proc;
+pub mod security;
 pub mod services;
 
 use crate::error::HuginnError;
@@ -55,8 +56,10 @@ pub fn collect_network(net: &mut NetworkInfo) -> Result<(), HuginnError> {
     Ok(())
 }
 
-pub fn collect_security_policies(security: &mut SecurityPolicies) -> Result<(), HuginnError> {
-    security.smb_v1_enabled = network::check_smb_v1();
+pub fn collect_security_policies(sec: &mut SecurityPolicies) -> Result<(), HuginnError> {
+    sec.smb_v1_enabled = network::check_smb_v1();
+    sec.ssh_config = security::read_ssh_config();
+    sec.kernel_params = security::read_kernel_params();
     Ok(())
 }
 

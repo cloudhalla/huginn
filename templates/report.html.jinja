@@ -117,15 +117,13 @@
 
     <!-- ── Findings ──────────────────────────────────────────── -->
     <section id="findings" class="section">
-      <div class="section-header">
-        <h2 class="section-title">Findings</h2>
-        <div class="filter-bar">
-          <button class="filter-btn active" data-severity="critical">Critical</button>
-          <button class="filter-btn active" data-severity="high">High</button>
-          <button class="filter-btn active" data-severity="medium">Medium</button>
-          <button class="filter-btn active" data-severity="low">Low</button>
-          <button class="filter-btn active" data-severity="info">Info</button>
-        </div>
+      <h2 class="section-title">Findings</h2>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-severity="critical">Critical</button>
+        <button class="filter-btn active" data-severity="high">High</button>
+        <button class="filter-btn active" data-severity="medium">Medium</button>
+        <button class="filter-btn active" data-severity="low">Low</button>
+        <button class="filter-btn active" data-severity="info">Info</button>
       </div>
 
       <!-- Findings table — click a row to jump to its detail card -->
@@ -231,6 +229,7 @@
           <thead>
             <tr>
               <th style="width:130px">Rule ID</th>
+              <th style="width:76px">Platform</th>
               <th>Control</th>
               <th style="width:90px">Status</th>
               <th>Notes</th>
@@ -240,6 +239,15 @@
             {% for f in report.findings %}
             <tr class="audit-row audit-{{ "pass" if f.passed else ("skip" if f.skipped else "fail") }}">
               <td class="mono">{{ f.rule_id }}</td>
+              <td>
+                {% if f.os_target == "linux" %}
+                <span class="os-badge os-linux">Linux</span>
+                {% elif f.os_target == "windows" %}
+                <span class="os-badge os-windows">Windows</span>
+                {% else %}
+                <span class="os-badge os-any">Any</span>
+                {% endif %}
+              </td>
               <td>{{ f.title }}</td>
               <td>
                 {% if f.passed %}

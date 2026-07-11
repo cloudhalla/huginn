@@ -115,6 +115,8 @@ pub struct Finding {
     pub passed: bool,
     #[serde(default)]
     pub skipped: bool,
+    #[serde(default)]
+    pub os_target: String,
 }
 
 impl Finding {
@@ -147,6 +149,7 @@ impl Finding {
             evidence: None,
             passed: false,
             skipped: false,
+            os_target: String::new(),
         }
     }
 
@@ -174,6 +177,7 @@ impl Finding {
             evidence: None,
             passed: false,
             skipped: true,
+            os_target: String::new(),
         }
     }
 
@@ -196,6 +200,7 @@ impl Finding {
             evidence: None,
             passed: true,
             skipped: false,
+            os_target: String::new(),
         }
     }
 

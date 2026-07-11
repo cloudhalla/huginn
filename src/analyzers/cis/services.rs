@@ -1,4 +1,4 @@
-use crate::analyzers::Analyzer;
+use crate::analyzers::{Analyzer, OsTarget};
 use crate::error::HuginnError;
 use crate::models::finding::{Category, ComplianceRef, Finding, Severity};
 use crate::models::system_info::SystemInfo;
@@ -13,6 +13,8 @@ impl Analyzer for UnquotedServicePathAnalyzer {
     fn name(&self) -> &'static str {
         "Service — Unquoted Binary Paths"
     }
+
+    fn target_os(&self) -> OsTarget { OsTarget::Windows }
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
@@ -83,6 +85,8 @@ impl Analyzer for WeakServicePermissionsAnalyzer {
     fn name(&self) -> &'static str {
         "Service — Weak Binary Permissions"
     }
+
+    fn target_os(&self) -> OsTarget { OsTarget::Windows }
 
     fn analyze(&self, info: &SystemInfo) -> Result<Vec<Finding>, HuginnError> {
         let mut findings = Vec::new();
