@@ -11,6 +11,7 @@ pub struct SeveritySummary {
     pub low: usize,
     pub info: usize,
     pub passed: usize,
+    pub skipped: usize,
     pub risk_score: u8,
 }
 
@@ -23,9 +24,14 @@ impl SeveritySummary {
             low: 0,
             info: 0,
             passed: 0,
+            skipped: 0,
             risk_score: 0,
         };
         for f in findings {
+            if f.skipped {
+                s.skipped += 1;
+                continue;
+            }
             if f.passed {
                 s.passed += 1;
                 continue;
@@ -48,6 +54,7 @@ impl SeveritySummary {
             + self.medium * 3
             + self.low * 2
             + self.info;
+        // skipped rules don't count toward the denominator — score based on rules with data
         let total = self.critical + self.high + self.medium + self.low + self.info + self.passed;
         if total == 0 {
             return 0;
@@ -97,6 +104,95 @@ impl Report {
     }
 
     pub fn failed_findings(&self) -> impl Iterator<Item = &Finding> {
-        self.findings.iter().filter(|f| !f.passed)
+        self.findings.iter().filter(|f| !f.passed && !f.skipped)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::finding::{Category, Finding, Severity};
+    use crate::models::system_info::SystemInfo;
+
+    fn critical_fail() -> Finding {
+        Finding::fail("X", "X", Severity::Critical, Category::NetworkSecurity, "d", "c", "e", "r")
+    }
+
+    fn high_fail() -> Finding {
+        Finding::fail("X", "X", Severity::High, Category::NetworkSecurity, "d", "c", "e", "r")
+    }
+
+    fn a_pass() -> Finding {
+        Finding::pass("X", "X", Category::AccountPolicy)
+    }
+
+    fn a_skip() -> Finding {
+        Finding::skip("X", "X", "reason", Category::AccountPolicy)
+    }
+
+    #[test]
+    fn severity_summary_counts_correctly() {
+        let findings = vec![
+            critical_fail(), critical_fail(),
+            high_fail(),
+            a_pass(), a_pass(), a_pass(),
+            a_skip(),
+        ];
+        let s = SeveritySummary::from_findings(&findings);
+        assert_eq!(s.critical, 2);
+        assert_eq!(s.high, 1);
+        assert_eq!(s.medium, 0);
+        assert_eq!(s.passed, 3);
+        assert_eq!(s.skipped, 1);
+    }
+
+    #[test]
+    fn risk_score_all_passed_is_zero() {
+        let findings = vec![a_pass(), a_pass(), a_pass()];
+        let s = SeveritySummary::from_findings(&findings);
+        assert_eq!(s.risk_score, 0);
+    }
+
+    #[test]
+    fn risk_score_all_critical_is_100() {
+        let findings = vec![critical_fail(), critical_fail()];
+        let s = SeveritySummary::from_findings(&findings);
+        assert_eq!(s.risk_score, 100);
+    }
+
+    #[test]
+    fn risk_score_empty_is_zero() {
+        let s = SeveritySummary::from_findings(&[]);
+        assert_eq!(s.risk_score, 0);
+    }
+
+    #[test]
+    fn risk_score_skipped_excluded_from_denominator() {
+        // 1 critical fail + 1 skipped → total (excl. skipped) = 1 → raw/max = 5/5 = 100
+        let findings = vec![critical_fail(), a_skip()];
+        let s = SeveritySummary::from_findings(&findings);
+        assert_eq!(s.risk_score, 100);
+    }
+
+    #[test]
+    fn failed_findings_excludes_passed_and_skipped() {
+        let findings = vec![critical_fail(), a_pass(), a_skip(), high_fail()];
+        let report = Report::new(SystemInfo::default(), findings);
+        let failed: Vec<_> = report.failed_findings().collect();
+        assert_eq!(failed.len(), 2);
+        assert!(failed.iter().all(|f| !f.passed && !f.skipped));
+    }
+
+    #[test]
+    fn report_sorts_findings_by_severity_descending() {
+        let findings = vec![
+            Finding::fail("C", "C", Severity::Low, Category::NetworkSecurity, "d", "c", "e", "r"),
+            Finding::fail("A", "A", Severity::Critical, Category::NetworkSecurity, "d", "c", "e", "r"),
+            Finding::fail("B", "B", Severity::High, Category::NetworkSecurity, "d", "c", "e", "r"),
+        ];
+        let report = Report::new(SystemInfo::default(), findings);
+        assert_eq!(report.findings[0].severity, Severity::Critical);
+        assert_eq!(report.findings[1].severity, Severity::High);
+        assert_eq!(report.findings[2].severity, Severity::Low);
     }
 }

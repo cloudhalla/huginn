@@ -3,6 +3,35 @@
 const severityWeights = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
 const activeFilters = new Set(['critical', 'high', 'medium', 'low', 'info']);
 
+// ── Theme ───────────────────────────────────────────────────────
+
+function initTheme() {
+  const saved = localStorage.getItem('huginn-theme');
+  const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  applyTheme(saved || preferred);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('huginn-theme', theme);
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const label = btn.querySelector('span:first-child');
+  const icon  = btn.querySelector('.theme-toggle-icon');
+  if (theme === 'dark') {
+    if (label) label.textContent = 'Dark Mode';
+    if (icon)  icon.textContent  = '☽';
+  } else {
+    if (label) label.textContent = 'Light Mode';
+    if (icon)  icon.textContent  = '☀';
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
 // ── Severity filter buttons ─────────────────────────────────────
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -21,6 +50,20 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
+function setOnlyFilter(sev) {
+  activeFilters.clear();
+  if (sev === 'all') {
+    ['critical', 'high', 'medium', 'low', 'info'].forEach(s => activeFilters.add(s));
+  } else {
+    activeFilters.add(sev);
+  }
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    const active = sev === 'all' || btn.dataset.severity === sev;
+    btn.classList.toggle('active', active);
+  });
+  applyFilters();
+}
+
 function applyFilters() {
   document.querySelectorAll('.finding-row').forEach(row => {
     row.style.display = activeFilters.has(row.dataset.severity) ? '' : 'none';
@@ -29,6 +72,20 @@ function applyFilters() {
     card.style.display = activeFilters.has(card.dataset.severity) ? '' : 'none';
   });
 }
+
+// ── Summary card clicks → filter + scroll ──────────────────────
+
+document.querySelectorAll('.summary-card[data-filter]').forEach(card => {
+  card.addEventListener('click', e => {
+    e.preventDefault();
+    const filter = card.dataset.filter;
+    setOnlyFilter(filter);
+    const findingsSection = document.getElementById('findings');
+    if (findingsSection) {
+      findingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
 
 // ── Table sort ──────────────────────────────────────────────────
 
@@ -40,7 +97,6 @@ document.querySelectorAll('th[data-sort]').forEach(th => {
     const col = th.dataset.sort;
     if (!th.classList.contains('sortable')) return;
 
-    // Clear sort indicators from all headers
     document.querySelectorAll('th[data-sort]').forEach(h => {
       h.textContent = h.textContent.replace(/ [▲▼]$/, '');
     });
@@ -72,6 +128,33 @@ function sortTable() {
   rows.forEach(r => tbody.appendChild(r));
 }
 
+// ── Finding row click → expand card + scroll ───────────────────
+
+document.querySelectorAll('.finding-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const cardId = 'card-' + row.dataset.card;
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    // Ensure visible (might be filtered out by severity filter in card list)
+    if (card.style.display === 'none') {
+      card.style.display = '';
+    }
+
+    if (!card.classList.contains('expanded')) {
+      card.classList.add('expanded');
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Pulse highlight
+    card.classList.remove('highlight');
+    void card.offsetWidth; // force reflow to restart animation
+    card.classList.add('highlight');
+    setTimeout(() => card.classList.remove('highlight'), 1400);
+  });
+});
+
 // ── Finding accordion ───────────────────────────────────────────
 
 document.querySelectorAll('.finding-header').forEach(header => {
@@ -90,6 +173,16 @@ document.querySelectorAll('.finding-card').forEach(card => {
   }
 });
 
+// ── Service table filter ────────────────────────────────────────
+
+function filterServices(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('#svc-table .svc-row').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+
 // ── Smooth sidebar navigation ───────────────────────────────────
 
 document.querySelectorAll('.nav-list a').forEach(link => {
@@ -98,9 +191,7 @@ document.querySelectorAll('.nav-list a').forEach(link => {
     if (href && href.startsWith('#')) {
       e.preventDefault();
       const target = document.querySelector(href);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
 });
@@ -110,20 +201,27 @@ document.querySelectorAll('.nav-list a').forEach(link => {
 const sections = document.querySelectorAll('section[id]');
 const navLinks = document.querySelectorAll('.nav-list a');
 
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      navLinks.forEach(link => {
-        link.style.color = '';
-        link.style.borderLeftColor = '';
-      });
-      const active = document.querySelector(`.nav-list a[href="#${entry.target.id}"]`);
-      if (active) {
-        active.style.color = 'var(--text)';
-        active.style.borderLeftColor = 'var(--accent)';
-      }
+function updateActiveNav() {
+  // Find the last section whose top edge is at or above 120px from the viewport top.
+  // This fires the highlight as soon as the section title scrolls into view,
+  // not when the previous section leaves.
+  const threshold = 120;
+  let current = sections[0];
+  sections.forEach(section => {
+    if (section.getBoundingClientRect().top <= threshold) {
+      current = section;
     }
   });
-}, { threshold: 0.2 });
+  navLinks.forEach(link => link.classList.remove('active'));
+  if (current) {
+    const active = document.querySelector(`.nav-list a[href="#${current.id}"]`);
+    if (active) active.classList.add('active');
+  }
+}
 
-sections.forEach(s => observer.observe(s));
+window.addEventListener('scroll', updateActiveNav, { passive: true });
+updateActiveNav();
+
+// ── Init ────────────────────────────────────────────────────────
+
+initTheme();

@@ -69,3 +69,48 @@ pub fn build_bloodhound_output(report: &Report) -> BloodHoundOutput {
         data: vec![computer],
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::report::Report;
+    use crate::models::system_info::SystemInfo;
+
+    fn empty_report() -> Report {
+        Report::new(SystemInfo::default(), vec![])
+    }
+
+    #[test]
+    fn bloodhound_output_meta_is_correct() {
+        let report = empty_report();
+        let output = build_bloodhound_output(&report);
+        assert_eq!(output.meta.kind, "computers");
+        assert_eq!(output.meta.count, 1);
+        assert_eq!(output.meta.version, 4);
+    }
+
+    #[test]
+    fn bloodhound_output_has_one_computer() {
+        let report = empty_report();
+        let output = build_bloodhound_output(&report);
+        assert_eq!(output.data.len(), 1);
+    }
+
+    #[test]
+    fn bloodhound_risk_score_matches_report() {
+        let report = empty_report();
+        let expected_score = report.summary.risk_score;
+        let output = build_bloodhound_output(&report);
+        assert_eq!(output.data[0].huginn_assessment.risk_score, expected_score);
+    }
+
+    #[test]
+    fn bloodhound_total_findings_matches_report() {
+        let report = empty_report();
+        let output = build_bloodhound_output(&report);
+        assert_eq!(
+            output.data[0].huginn_assessment.total_findings,
+            report.summary.total_failed()
+        );
+    }
+}

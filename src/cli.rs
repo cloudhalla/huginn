@@ -30,9 +30,6 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',', global = true)]
     pub collectors: Option<Vec<String>>,
 
-    /// Include passed checks in output
-    #[arg(long, global = true)]
-    pub include_passed: bool,
 }
 
 #[derive(Subcommand, Debug)]

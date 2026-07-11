@@ -151,11 +151,34 @@ pub struct FirewallProfile {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct DnsLinkInfo {
+    pub index: u32,
+    pub name: String,
+    pub current_scopes: Option<String>,
+    pub protocols: Option<String>,
+    pub current_dns_server: Option<String>,
+    pub dns_servers: Vec<String>,
+    pub dns_domain: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct DnsInfo {
+    pub protocols: Option<String>,
+    pub resolv_conf_mode: Option<String>,
+    pub current_dns_server: Option<String>,
+    pub dns_servers: Vec<String>,
+    pub dns_domain: Option<String>,
+    pub links: Vec<DnsLinkInfo>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct NetworkInfo {
     pub interfaces: Vec<NetworkInterface>,
     pub open_ports: Vec<OpenPort>,
     pub firewall_profiles: Vec<FirewallProfile>,
     pub dns_servers: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_info: Option<DnsInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_settings: Option<String>,
 }
@@ -191,6 +214,12 @@ pub struct SecurityPolicies {
     pub powershell_transcription: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitlocker_status: Option<String>,
+    /// Key → value map of sshd_config settings (lowercase keys)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub ssh_config: HashMap<String, String>,
+    /// Key → value map of /proc/sys kernel parameter readings
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub kernel_params: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
