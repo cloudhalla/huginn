@@ -145,7 +145,10 @@ impl Analyzer for PasswordPolicyAnalyzer {
             None => findings.push(Finding::skip(
                 "CIS-1.1.4",
                 "Password complexity requirements — data unavailable",
-                "Password policy data could not be collected on this platform.",
+                "Password complexity setting could not be collected. On Windows, this value \
+                 lives in the local security policy and typically requires administrator \
+                 privileges to read (via `secedit /export`). Re-run huginn from an elevated \
+                 prompt to include this check.",
                 Category::AccountPolicy,
             )),
             Some(false) => findings.push(
@@ -178,7 +181,15 @@ impl Analyzer for PasswordPolicyAnalyzer {
 
         // CIS 1.1.5 — Reversible encryption disabled (Windows only, skip silently on Linux)
         if std::env::consts::OS == "windows" { match policy.reversible_encryption {
-            None => {}
+            None => findings.push(Finding::skip(
+                "CIS-1.1.5",
+                "Reversible password encryption — data unavailable",
+                "Reversible-encryption setting could not be collected. On Windows, this value \
+                 lives in the local security policy and typically requires administrator \
+                 privileges to read (via `secedit /export`). Re-run huginn from an elevated \
+                 prompt to include this check.",
+                Category::AccountPolicy,
+            )),
             Some(true) => findings.push(
                 Finding::fail(
                     "CIS-1.1.5",

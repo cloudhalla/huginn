@@ -1,9 +1,10 @@
-use windows::Win32::Foundation::{ERROR_SUCCESS, WIN32_ERROR};
+use windows::Win32::Foundation::{ERROR_NO_MORE_ITEMS, ERROR_SUCCESS, WIN32_ERROR};
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY, REG_DWORD,
-    REG_EXPAND_SZ, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegOpenKeyExW, RegQueryValueExW,
+    REG_EXPAND_SZ, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegEnumKeyExW, RegOpenKeyExW,
+    RegQueryValueExW,
 };
-use windows::core::PCWSTR;
+use windows::core::{PCWSTR, PWSTR};
 
 struct HKeyGuard(HKEY);
 
@@ -109,4 +110,34 @@ pub fn read_reg_string(path: &str, value: &str) -> Option<String> {
 
     let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
     Some(String::from_utf16_lossy(&buf[..end]))
+}
+
+pub fn enum_subkeys(path: &str) -> Vec<String> {
+    let Some(guard) = open_key(path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut idx = 0u32;
+    loop {
+        let mut name_buf = [0u16; 256];
+        let mut name_len = name_buf.len() as u32;
+        let rc: WIN32_ERROR = unsafe {
+            RegEnumKeyExW(
+                guard.0,
+                idx,
+                PWSTR(name_buf.as_mut_ptr()),
+                &mut name_len,
+                None,
+                PWSTR::null(),
+                None,
+                None,
+            )
+        };
+        if rc == ERROR_NO_MORE_ITEMS || rc != ERROR_SUCCESS {
+            break;
+        }
+        out.push(String::from_utf16_lossy(&name_buf[..name_len as usize]));
+        idx += 1;
+    }
+    out
 }

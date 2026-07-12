@@ -1,4 +1,6 @@
 pub mod registry;
+mod software;
+mod users;
 
 use crate::error::HuginnError;
 use crate::models::system_info::*;
@@ -20,10 +22,8 @@ pub fn collect_system_info(os: &mut OsInfo) -> Result<(), HuginnError> {
     Ok(())
 }
 
-pub fn collect_users(users: &mut UserInfo) -> Result<(), HuginnError> {
-    // Tier 2: NetUserEnum / NetLocalGroupGetMembers / LsaQueryInformationPolicy
-    let _ = users;
-    Ok(())
+pub fn collect_users(u: &mut UserInfo) -> Result<(), HuginnError> {
+    users::collect(u)
 }
 
 pub fn collect_services(services: &mut ServicesInfo) -> Result<(), HuginnError> {
@@ -72,10 +72,8 @@ pub fn collect_security_policies(security: &mut SecurityPolicies) -> Result<(), 
     Ok(())
 }
 
-pub fn collect_software(software: &mut SoftwareInfo) -> Result<(), HuginnError> {
-    // Tier 2: enumerate HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall
-    let _ = software;
-    Ok(())
+pub fn collect_software(sw: &mut SoftwareInfo) -> Result<(), HuginnError> {
+    software::collect(sw)
 }
 
 pub fn collect_scheduled_tasks(tasks: &mut ScheduledTasksInfo) -> Result<(), HuginnError> {
