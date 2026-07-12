@@ -33,6 +33,8 @@ windows = { version = "0.58", features = [
     "Win32_System_SystemInformation",
     "Win32_NetworkManagement_IpHelper",
     "Win32_NetworkManagement_NetManagement",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

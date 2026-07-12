@@ -1,5 +1,8 @@
 pub mod registry;
+mod network;
+mod services;
 mod software;
+mod tasks;
 mod users;
 
 use crate::error::HuginnError;
@@ -26,15 +29,22 @@ pub fn collect_users(u: &mut UserInfo) -> Result<(), HuginnError> {
     users::collect(u)
 }
 
-pub fn collect_services(services: &mut ServicesInfo) -> Result<(), HuginnError> {
-    // Tier 2: OpenSCManager / EnumServicesStatusEx
-    let _ = services;
-    Ok(())
+pub fn collect_services(s: &mut ServicesInfo) -> Result<(), HuginnError> {
+    services::collect(s)
 }
 
 pub fn collect_network(net: &mut NetworkInfo) -> Result<(), HuginnError> {
-    // Tier 2: GetAdaptersInfo / GetExtendedTcpTable / NetFwPolicy2
-    let _ = net;
+    net.interfaces = network::list_interfaces();
+    net.open_ports = network::list_open_ports();
+    net.firewall_profiles = network::get_firewall_profiles();
+    net.dns_servers = net
+        .interfaces
+        .iter()
+        .flat_map(|i| i.dns_servers.iter().cloned())
+        .filter(|s| !s.is_empty())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
     Ok(())
 }
 
@@ -76,10 +86,8 @@ pub fn collect_software(sw: &mut SoftwareInfo) -> Result<(), HuginnError> {
     software::collect(sw)
 }
 
-pub fn collect_scheduled_tasks(tasks: &mut ScheduledTasksInfo) -> Result<(), HuginnError> {
-    // Tier 2: ITaskService COM interface
-    let _ = tasks;
-    Ok(())
+pub fn collect_scheduled_tasks(t: &mut ScheduledTasksInfo) -> Result<(), HuginnError> {
+    tasks::collect(t)
 }
 
 // ---------------------------------------------------------------------------
